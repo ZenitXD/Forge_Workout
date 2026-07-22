@@ -135,6 +135,7 @@ export async function getActiveBlock(): Promise<TrainingBlock | null> {
     phase: data.phase as PhaseType,
     cycleIndex: data.cycle_index,
     weekIndex: data.week_index,
+    dayIndex: data.day_index ?? 0,
     blockLengthWeeks: data.block_length_weeks,
     status: data.status,
     startedAt: data.started_at ?? null,
@@ -151,6 +152,7 @@ export async function createInitialBlock(goal: UserProfile["goal"]): Promise<Tra
       phase: firstPhase,
       cycle_index: 0,
       week_index: 0,
+      day_index: 0,
       block_length_weeks: PHASE_CONFIG[firstPhase].weeks,
       status: "active",
     })
@@ -162,6 +164,7 @@ export async function createInitialBlock(goal: UserProfile["goal"]): Promise<Tra
     phase: data.phase,
     cycleIndex: data.cycle_index,
     weekIndex: data.week_index,
+    dayIndex: data.day_index,
     blockLengthWeeks: data.block_length_weeks,
     status: data.status,
     startedAt: data.started_at ?? null,
@@ -193,6 +196,7 @@ export async function advancePhase(block: TrainingBlock): Promise<TrainingBlock>
       phase: nextPhase,
       cycle_index: nextCycle,
       week_index: 0,
+      day_index: 0,
       block_length_weeks: PHASE_CONFIG[nextPhase].weeks,
       status: "active",
     })
@@ -204,6 +208,7 @@ export async function advancePhase(block: TrainingBlock): Promise<TrainingBlock>
     phase: data.phase,
     cycleIndex: data.cycle_index,
     weekIndex: data.week_index,
+    dayIndex: data.day_index,
     blockLengthWeeks: data.block_length_weeks,
     status: data.status,
     startedAt: data.started_at ?? null,
@@ -340,26 +345,29 @@ export async function generateWorkout(block: TrainingBlock): Promise<Workout> {
   if (!profile) {
     return generateFallbackWorkout(block);
   }
-  const [history, volume] = await Promise.all([
+  const [history, volume, lastWeights] = await Promise.all([
     fetchExerciseHistory(),
     fetchMuscleVolume(),
+    fetchLastWeights(),
   ]);
-  return generateProfiledWorkout(profile, block, history, volume);
+  return generateProfiledWorkout(profile, block, history, volume, lastWeights);
 }
 
 async function generateProfiledWorkout(
   profile: UserProfile,
   block: TrainingBlock,
   history: Map<string, number>,
-  volume: Map<string, number>
+  volume: Map<string, number>,
+  lastWeights: Map<string, number>
 ): Promise<Workout> {
   const exercises = await fetchExercises();
   const config = PHASE_CONFIG[block.phase];
   const template = SPLIT_TEMPLATES[profile.split] ?? SPLIT_TEMPLATES.ppl;
 
-  const dayIndex = block.weekIndex % template.days.length;
-  const slots = template.days[dayIndex];
-  const dayName = `${template.name} — Day ${dayIndex + 1}`;
+  const dayIdx = block.dayIndex % template.days.length;
+  const slots = template.days[dayIdx];
+  const workoutLetter = String.fromCharCode(65 + dayIdx);
+  const dayName = `Workout ${workoutLetter} — Day ${block.dayIndex + 1}`;
 
   const maxExercises = Math.min(
     slots.length,
@@ -382,7 +390,7 @@ async function generateProfiledWorkout(
     primaryMuscle: ex.primaryMuscle,
     secondaryMuscles: ex.secondaryMuscles,
     equipment: ex.equipment,
-    sets: buildSets(config.sets, config.repTarget, estimateWeight(ex, block.phase, profile)),
+    sets: buildSets(config.sets, config.repTarget, 0),
     restSeconds: config.rest,
     notes: ex.unilateral && profile.medical.includes("Asymmetrical strength")
       ? "Perform each side separately. Start with your weaker side."
@@ -390,6 +398,7 @@ async function generateProfiledWorkout(
     slotTag: ex.slotTag,
     isCompound: ex.compound,
     unilateral: ex.unilateral,
+    lastWeight: lastWeights.get(ex.id) ?? null,
   }));
 
   const totalSets = workoutExercises.reduce((s, e) => s + e.sets.length, 0);
@@ -398,7 +407,9 @@ async function generateProfiledWorkout(
   return {
     id: `workout-${Date.now()}`,
     name: dayName,
-    dayLabel: `Week ${block.weekIndex} — ${config.label} Phase`,
+    dayLabel: `Week ${block.weekIndex + 1} — ${config.label} Phase`,
+    workoutLetter,
+    dayNumber: block.dayIndex + 1,
     phase: block.phase,
     weekIndex: block.weekIndex,
     estimatedDurationMin: estimatedDuration,
@@ -574,7 +585,9 @@ function generateFallbackWorkout(block: TrainingBlock): Promise<Workout> {
   return Promise.resolve({
     id: `workout-${Date.now()}`,
     name: "Workout",
-    dayLabel: `Week ${block.weekIndex} — ${config.label} Phase`,
+    dayLabel: `Week ${block.weekIndex + 1} — ${config.label} Phase`,
+    workoutLetter: "A",
+    dayNumber: block.dayIndex + 1,
     phase: block.phase,
     weekIndex: block.weekIndex,
     estimatedDurationMin: 45,
@@ -590,25 +603,6 @@ function buildSets(count: number, repTarget: number, weight: number): ExerciseSe
     completed: false,
     side: "both" as const,
   }));
-}
-
-function estimateWeight(ex: ExerciseDB, phase: PhaseType, profile: UserProfile): number {
-  const bodyweightFactor = profile.weight ? profile.weight / 75 : 1;
-  const base =
-    ex.primaryMuscle === "chest" ? 22.5
-    : ex.primaryMuscle === "shoulders" ? (ex.compound ? 35 : 10)
-    : ex.primaryMuscle === "back" ? 40
-    : ex.primaryMuscle === "legs" ? (ex.compound ? 60 : 30)
-    : ex.primaryMuscle === "arms" ? 12
-    : ex.primaryMuscle === "calves" ? 40
-    : ex.primaryMuscle === "abs" ? 20
-    : 20;
-  const adjusted = base * bodyweightFactor;
-  return phase === "strength"
-    ? Math.round(adjusted * 1.15)
-    : phase === "endurance"
-    ? Math.round(adjusted * 0.65)
-    : Math.round(adjusted);
 }
 
 // ============================================================
@@ -734,6 +728,29 @@ export async function fetchExerciseHistory(): Promise<Map<string, number>> {
   return map;
 }
 
+export async function fetchLastWeights(): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from("logged_sets")
+    .select(`
+      weight,
+      workout_exercises!inner(exercise_id)
+    `)
+    .eq("completed", true)
+    .gt("weight", 0)
+    .order("performed_at", { ascending: false })
+    .limit(200);
+  if (error || !data) return new Map();
+  const map = new Map<string, number>();
+  for (const row of data as unknown as Array<Record<string, unknown>>) {
+    const we = row.workout_exercises as Record<string, unknown>;
+    const exId = we.exercise_id as string;
+    if (!map.has(exId)) {
+      map.set(exId, Number(row.weight));
+    }
+  }
+  return map;
+}
+
 export async function fetchMuscleVolume(): Promise<Map<string, number>> {
   const { data, error } = await supabase.rpc("weekly_muscle_volume");
   if (error || !data) return new Map();
@@ -808,13 +825,38 @@ export async function saveWorkoutToDB(
 }
 
 export async function completeWorkout(
-  workoutId: string
+  workoutId: string,
+  exercises: WorkoutExercise[]
 ): Promise<void> {
   const { error } = await supabase
     .from("workouts")
     .update({ completed: true, completed_at: new Date().toISOString() })
     .eq("id", workoutId);
   if (error) throw error;
+
+  const { data: weRows } = await supabase
+    .from("workout_exercises")
+    .select("id, exercise_id, slot_order")
+    .eq("workout_id", workoutId);
+  if (!weRows) return;
+
+  for (const ex of exercises) {
+    const weRow = (weRows as Array<{ id: string; exercise_id: string; slot_order: number }>)
+      .find((r) => r.exercise_id === ex.exerciseId);
+    if (!weRow) continue;
+    for (const set of ex.sets) {
+      await supabase.from("logged_sets")
+        .update({
+          weight: set.weight,
+          reps: set.reps,
+          completed: set.completed,
+          rpe: set.rpe ?? null,
+          performed_at: new Date().toISOString(),
+        })
+        .eq("workout_exercise_id", weRow.id)
+        .eq("set_index", set.setIndex);
+    }
+  }
 }
 
 // ============================================================
@@ -834,14 +876,11 @@ export async function advanceWorkoutDay(
 ): Promise<{ block: TrainingBlock; reprogramRecommended: boolean }> {
   const template = SPLIT_TEMPLATES[profile.split] ?? SPLIT_TEMPLATES.ppl;
   const dayCount = template.days.length;
-  const newWeekIndex = block.weekIndex + 1;
+  const newDayIndex = block.dayIndex + 1;
+  const newWeekIndex = Math.floor(newDayIndex / dayCount);
 
-  const completedInBlock = await fetchCompletedWorkoutCount(block.id);
-  const sessionsPerPhase = dayCount;
-  const phaseComplete = completedInBlock >= sessionsPerPhase;
-
-  if (!phaseComplete) {
-    const updated = { ...block, weekIndex: newWeekIndex };
+  if (newWeekIndex < block.blockLengthWeeks) {
+    const updated = { ...block, dayIndex: newDayIndex, weekIndex: newWeekIndex };
     await updateBlock(updated);
     return { block: updated, reprogramRecommended: false };
   }
@@ -864,7 +903,8 @@ export async function advanceWorkoutDay(
     phase: PHASE_CYCLE_ORDER[nextPhaseIdx],
     cycleIndex: newCycleIndex,
     weekIndex: 0,
-    blockLengthWeeks: PHASE_CONFIG[PHASE_ORDER[nextPhaseIdx]].weeks,
+    dayIndex: 0,
+    blockLengthWeeks: PHASE_CONFIG[PHASE_CYCLE_ORDER[nextPhaseIdx]].weeks,
     status: "active",
     startedAt: new Date().toISOString(),
     completedAt: null,
@@ -874,18 +914,12 @@ export async function advanceWorkoutDay(
   return { block: newBlock, reprogramRecommended };
 }
 
-async function fetchCompletedWorkoutCount(blockId: string): Promise<number> {
-  const { data, error } = await supabase
-    .rpc("completed_workout_count", { p_block_id: blockId });
-  if (error || !data) return 0;
-  return data as number;
-}
-
 async function updateBlock(block: TrainingBlock): Promise<void> {
   const { error } = await supabase
     .from("training_blocks")
     .update({
       week_index: block.weekIndex,
+      day_index: block.dayIndex,
       status: block.status,
       completed_at: block.completedAt,
     })
@@ -899,6 +933,7 @@ async function createBlock(block: TrainingBlock): Promise<void> {
     phase: block.phase,
     cycle_index: block.cycleIndex,
     week_index: block.weekIndex,
+    day_index: block.dayIndex,
     block_length_weeks: block.blockLengthWeeks,
     status: block.status,
     started_at: block.startedAt,

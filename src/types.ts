@@ -1,10 +1,12 @@
 export type Screen =
   | "splash"
   | "onboarding"
+  | "home"
   | "workout-preview"
   | "workout-active"
   | "progress"
   | "settings"
+  | "week-summary"
   | "phase-transition";
 
 export type ExperienceLevel = "beginner" | "intermediate" | "advanced";
@@ -100,12 +102,15 @@ export interface WorkoutExercise {
   slotTag: string;
   isCompound: boolean;
   unilateral: boolean;
+  lastWeight?: number | null;
 }
 
 export interface Workout {
   id: string;
   name: string;
   dayLabel: string;
+  workoutLetter: string;
+  dayNumber: number;
   phase: PhaseType;
   weekIndex: number;
   estimatedDurationMin: number;
@@ -117,6 +122,7 @@ export interface TrainingBlock {
   phase: PhaseType;
   cycleIndex: number;
   weekIndex: number;
+  dayIndex: number;
   blockLengthWeeks: number;
   status: "active" | "complete";
   startedAt: string | null;

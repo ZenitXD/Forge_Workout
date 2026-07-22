@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { Icon } from "./components/Icon";
 import { Splash } from "./screens/Splash";
 import { Onboarding } from "./screens/Onboarding";
+import { Home } from "./screens/Home";
 import { WorkoutPreview } from "./screens/WorkoutPreview";
 import { WorkoutActive } from "./screens/WorkoutActive";
-import { ProgressScreen } from "./screens/Progress";
 import { Settings } from "./screens/Settings";
+import { WeekSummary } from "./screens/WeekSummary";
 import {
   generateWorkout,
   getActiveBlock,
@@ -15,8 +16,20 @@ import {
   completeWorkout,
   advanceWorkoutDay,
   resetAllData,
+  getSplitInfo,
 } from "./lib/data";
-import type { Screen, UserProfile, Workout, TrainingBlock } from "./types";
+import type { Screen, UserProfile, Workout, WorkoutExercise, TrainingBlock } from "./types";
+
+function phaseLabel(phase: string): string {
+  const labels: Record<string, string> = {
+    hypertrophy: "Hypertrophy",
+    strength: "Strength",
+    endurance: "Endurance",
+    power: "Power",
+    deload: "Deload",
+  };
+  return labels[phase] ?? phase;
+}
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("splash");
@@ -26,6 +39,12 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [savedWorkoutId, setSavedWorkoutId] = useState<string | null>(null);
   const [reprogramNotice, setReprogramNotice] = useState(false);
+  const [weekSummaryData, setWeekSummaryData] = useState<{
+    weekCompleted: number;
+    phaseLabel: string;
+    phaseChanged: boolean;
+    newPhaseLabel: string;
+  } | null>(null);
 
   async function handleOnboardingComplete(p: UserProfile) {
     setLoading(true);
@@ -41,17 +60,19 @@ export default function App() {
       setWorkout(generated);
       const wId = await saveWorkoutToDB(generated, activeBlock.id);
       setSavedWorkoutId(wId);
-      setScreen("workout-preview");
+      setScreen("home");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleWorkoutComplete() {
+  async function handleWorkoutComplete(exercises: WorkoutExercise[]) {
     if (savedWorkoutId) {
       try {
-        await completeWorkout(savedWorkoutId);
+        await completeWorkout(savedWorkoutId, exercises);
         if (block && profile) {
+          const oldPhase = block.phase;
+          const oldDayIndex = block.dayIndex;
           const { block: newBlock, reprogramRecommended } = await advanceWorkoutDay(block, profile);
           setBlock(newBlock);
           if (reprogramRecommended) {
@@ -61,12 +82,28 @@ export default function App() {
           setWorkout(generated);
           const wId = await saveWorkoutToDB(generated, newBlock.id);
           setSavedWorkoutId(wId);
+
+          const phaseChanged = newBlock.phase !== oldPhase;
+          const dayCount = getSplitInfo(profile.split).dayCount;
+          const weekJustCompleted = Math.floor((oldDayIndex + 1) / dayCount);
+          const isWeekBoundary = (oldDayIndex + 1) % dayCount === 0;
+
+          if (phaseChanged || isWeekBoundary) {
+            setWeekSummaryData({
+              weekCompleted: weekJustCompleted,
+              phaseLabel: phaseLabel(oldPhase),
+              phaseChanged,
+              newPhaseLabel: phaseLabel(newBlock.phase),
+            });
+            setScreen("week-summary");
+            return;
+          }
         }
       } catch (e) {
         console.error("Failed to complete workout:", e);
       }
     }
-    setScreen("workout-preview");
+    setScreen("home");
   }
 
   async function handleResetData() {
@@ -138,6 +175,15 @@ export default function App() {
         />
       )}
 
+      {screen === "home" && profile && (
+        <Home
+          workout={workout}
+          block={block}
+          onStartWorkout={() => setScreen("workout-preview")}
+          onSettings={() => setScreen("settings")}
+        />
+      )}
+
       {screen === "workout-preview" && workout && profile && (
         <>
           {reprogramNotice && (
@@ -182,8 +228,7 @@ export default function App() {
             workout={workout}
             profile={profile}
             onStart={() => setScreen("workout-active")}
-            onBack={() => setScreen("settings")}
-            onProgress={() => setScreen("progress")}
+            onBack={() => setScreen("home")}
             onSettings={() => setScreen("settings")}
           />
         </>
@@ -197,14 +242,20 @@ export default function App() {
         />
       )}
 
-      {screen === "progress" && (
-        <ProgressScreen onBack={() => setScreen("workout-preview")} />
+      {screen === "week-summary" && weekSummaryData && (
+        <WeekSummary
+          weekCompleted={weekSummaryData.weekCompleted}
+          phaseLabel={weekSummaryData.phaseLabel}
+          phaseChanged={weekSummaryData.phaseChanged}
+          newPhaseLabel={weekSummaryData.newPhaseLabel}
+          onContinue={() => setScreen("home")}
+        />
       )}
 
       {screen === "settings" && (
         <Settings
           profile={profile}
-          onBack={() => setScreen("workout-preview")}
+          onBack={() => setScreen("home")}
           onResetData={handleResetData}
           onRegenerateWorkout={handleRegenerateWorkout}
         />

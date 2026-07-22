@@ -11,7 +11,6 @@ interface WorkoutPreviewProps {
   profile: UserProfile;
   onStart: () => void;
   onBack: () => void;
-  onProgress: () => void;
   onSettings: () => void;
 }
 
@@ -21,36 +20,18 @@ const PHASE_LABELS: Record<PhaseType, { label: string; color: string }> = {
   endurance: { label: "Endurance", color: "var(--accent-bright)" },
 };
 
-export function WorkoutPreview({ workout, profile, onStart, onBack, onProgress, onSettings }: WorkoutPreviewProps) {
+export function WorkoutPreview({ workout, profile, onStart, onBack, onSettings }: WorkoutPreviewProps) {
   const totalSets = workout.exercises.reduce((s, e) => s + e.sets.length, 0);
   const phase = PHASE_LABELS[workout.phase];
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <ScreenHeader
-        title="Today's Workout"
+        title={`Workout ${workout.workoutLetter} — Day ${workout.dayNumber}`}
         subtitle={workout.dayLabel}
         onBack={onBack}
         right={
           <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-            <button
-              onClick={onProgress}
-              aria-label="View progress"
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 10,
-                background: "var(--bg-surface)",
-                border: "1px solid var(--border)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--fg-secondary)",
-                transition: "all 0.2s var(--ease-out)",
-              }}
-            >
-              <Icon name="activity" size={20} />
-            </button>
             <button
               onClick={onSettings}
               aria-label="Settings"
@@ -187,11 +168,15 @@ function ExerciseRow({ exercise, index }: { exercise: WorkoutExercise; index: nu
           <div style={{ display: "flex", gap: "var(--space-3)", fontSize: "0.8125rem", color: "var(--fg-secondary)", flexWrap: "wrap" }}>
             <span>{exercise.sets.length} × {exercise.sets[0]?.reps} reps</span>
             <span>·</span>
-            <span>{exercise.sets[0]?.weight} kg</span>
-            <span>·</span>
             <span>{exercise.restSeconds}s rest</span>
             <span>·</span>
             <span style={{ textTransform: "capitalize" }}>{exercise.primaryMuscle}</span>
+            {exercise.lastWeight != null && exercise.lastWeight > 0 && (
+              <>
+                <span>·</span>
+                <span style={{ color: "var(--accent-bright)" }}>Last: {exercise.lastWeight} kg</span>
+              </>
+            )}
           </div>
           {exercise.instructions && (
             <button
