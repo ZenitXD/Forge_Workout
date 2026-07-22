@@ -89,6 +89,7 @@ export interface WorkoutExercise {
   exerciseId: string;
   name: string;
   imageUrl: string;
+  instructions: string;
   primaryMuscle: string;
   secondaryMuscles: string[];
   equipment: string;
@@ -117,6 +118,8 @@ export interface TrainingBlock {
   weekIndex: number;
   blockLengthWeeks: number;
   status: "active" | "complete";
+  startedAt: string | null;
+  completedAt: string | null;
 }
 
 export interface LoggedSet {
@@ -143,4 +146,14 @@ export interface ImbalanceData {
   leftMax: number;
   rightMax: number;
   imbalancePct: number;
+}
+
+export interface ExerciseHistoryEntry {
+  exerciseId: string;
+  daysAgo: number;
+}
+
+export interface MuscleVolume {
+  muscle: string;
+  weeklySets: number;
 }

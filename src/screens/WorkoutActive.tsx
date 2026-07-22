@@ -185,6 +185,7 @@ export function WorkoutActive({ workout, onComplete, onBack }: WorkoutActiveProp
 }
 
 function ExerciseHeader({ exercise, index }: { exercise: WorkoutExercise; index: number }) {
+  const [showInstructions, setShowInstructions] = useState(false);
   return (
     <div
       style={{
@@ -214,6 +215,41 @@ function ExerciseHeader({ exercise, index }: { exercise: WorkoutExercise; index:
               </>
             )}
           </div>
+          {exercise.instructions && (
+            <button
+              onClick={() => setShowInstructions(!showInstructions)}
+              style={{
+                marginTop: "var(--space-3)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: "0.8125rem",
+                color: "var(--accent-bright)",
+                fontWeight: 500,
+                transition: "all 0.2s var(--ease-out)",
+              }}
+            >
+              <Icon name={showInstructions ? "chevron-down" : "chevron-right"} size={16} />
+              {showInstructions ? "Hide instructions" : "How to perform"}
+            </button>
+          )}
+          {showInstructions && exercise.instructions && (
+            <div
+              style={{
+                marginTop: "var(--space-3)",
+                padding: "var(--space-4)",
+                borderRadius: "var(--radius-md)",
+                background: "var(--bg-surface-2)",
+                border: "1px solid var(--border)",
+                fontSize: "0.875rem",
+                color: "var(--fg-secondary)",
+                lineHeight: 1.6,
+                animation: "fadeInUp 0.3s var(--ease-out)",
+              }}
+            >
+              {exercise.instructions}
+            </div>
+          )}
         </div>
       </div>
     </div>

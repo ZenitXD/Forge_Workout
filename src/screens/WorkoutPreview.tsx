@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Icon } from "../components/Icon";
@@ -150,6 +151,7 @@ function StatChip({ icon, label, value }: { icon: string; label: string; value: 
 }
 
 function ExerciseRow({ exercise, index }: { exercise: WorkoutExercise; index: number }) {
+  const [showInstructions, setShowInstructions] = useState(false);
   return (
     <Card padding="var(--space-4)">
       <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start" }}>
@@ -172,6 +174,41 @@ function ExerciseRow({ exercise, index }: { exercise: WorkoutExercise; index: nu
             <span>·</span>
             <span style={{ textTransform: "capitalize" }}>{exercise.primaryMuscle}</span>
           </div>
+          {exercise.instructions && (
+            <button
+              onClick={() => setShowInstructions(!showInstructions)}
+              style={{
+                marginTop: "var(--space-2)",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: "0.8125rem",
+                color: "var(--accent-bright)",
+                fontWeight: 500,
+                transition: "all 0.2s var(--ease-out)",
+              }}
+            >
+              <Icon name={showInstructions ? "chevron-down" : "chevron-right"} size={14} />
+              {showInstructions ? "Hide" : "Instructions"}
+            </button>
+          )}
+          {showInstructions && exercise.instructions && (
+            <div
+              style={{
+                marginTop: "var(--space-2)",
+                padding: "var(--space-3)",
+                borderRadius: "var(--radius-md)",
+                background: "var(--bg-surface-2)",
+                border: "1px solid var(--border)",
+                fontSize: "0.8125rem",
+                color: "var(--fg-secondary)",
+                lineHeight: 1.5,
+                animation: "fadeInUp 0.3s var(--ease-out)",
+              }}
+            >
+              {exercise.instructions}
+            </div>
+          )}
         </div>
       </div>
     </Card>
