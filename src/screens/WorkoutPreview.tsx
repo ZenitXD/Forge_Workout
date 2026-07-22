@@ -12,6 +12,7 @@ interface WorkoutPreviewProps {
   onStart: () => void;
   onBack: () => void;
   onProgress: () => void;
+  onSettings: () => void;
 }
 
 const PHASE_LABELS: Record<PhaseType, { label: string; color: string }> = {
@@ -20,7 +21,7 @@ const PHASE_LABELS: Record<PhaseType, { label: string; color: string }> = {
   endurance: { label: "Endurance", color: "var(--accent-bright)" },
 };
 
-export function WorkoutPreview({ workout, profile, onStart, onBack, onProgress }: WorkoutPreviewProps) {
+export function WorkoutPreview({ workout, profile, onStart, onBack, onProgress, onSettings }: WorkoutPreviewProps) {
   const totalSets = workout.exercises.reduce((s, e) => s + e.sets.length, 0);
   const phase = PHASE_LABELS[workout.phase];
 
@@ -49,6 +50,24 @@ export function WorkoutPreview({ workout, profile, onStart, onBack, onProgress }
               }}
             >
               <Icon name="activity" size={20} />
+            </button>
+            <button
+              onClick={onSettings}
+              aria-label="Settings"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 10,
+                background: "var(--bg-surface)",
+                border: "1px solid var(--border)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--fg-secondary)",
+                transition: "all 0.2s var(--ease-out)",
+              }}
+            >
+              <Icon name="settings" size={20} />
             </button>
             <div
               style={{

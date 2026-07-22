@@ -4,6 +4,7 @@ export type Screen =
   | "workout-preview"
   | "workout-active"
   | "progress"
+  | "settings"
   | "phase-transition";
 
 export type ExperienceLevel = "beginner" | "intermediate" | "advanced";

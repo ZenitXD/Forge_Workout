@@ -5,6 +5,7 @@ import { Onboarding } from "./screens/Onboarding";
 import { WorkoutPreview } from "./screens/WorkoutPreview";
 import { WorkoutActive } from "./screens/WorkoutActive";
 import { ProgressScreen } from "./screens/Progress";
+import { Settings } from "./screens/Settings";
 import {
   generateWorkout,
   getActiveBlock,
@@ -13,6 +14,7 @@ import {
   saveWorkoutToDB,
   completeWorkout,
   advanceWorkoutDay,
+  resetAllData,
 } from "./lib/data";
 import type { Screen, UserProfile, Workout, TrainingBlock } from "./types";
 
@@ -65,6 +67,35 @@ export default function App() {
       }
     }
     setScreen("workout-preview");
+  }
+
+  async function handleResetData() {
+    setLoading(true);
+    try {
+      await resetAllData();
+      setProfile(null);
+      setWorkout(null);
+      setBlock(null);
+      setSavedWorkoutId(null);
+      setReprogramNotice(false);
+      setScreen("splash");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRegenerateWorkout() {
+    if (!block) return;
+    setLoading(true);
+    try {
+      const generated = await generateWorkout(block);
+      setWorkout(generated);
+      const wId = await saveWorkoutToDB(generated, block.id);
+      setSavedWorkoutId(wId);
+      setScreen("workout-preview");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -151,8 +182,9 @@ export default function App() {
             workout={workout}
             profile={profile}
             onStart={() => setScreen("workout-active")}
-            onBack={() => setScreen("onboarding")}
+            onBack={() => setScreen("settings")}
             onProgress={() => setScreen("progress")}
+            onSettings={() => setScreen("settings")}
           />
         </>
       )}
@@ -167,6 +199,15 @@ export default function App() {
 
       {screen === "progress" && (
         <ProgressScreen onBack={() => setScreen("workout-preview")} />
+      )}
+
+      {screen === "settings" && (
+        <Settings
+          profile={profile}
+          onBack={() => setScreen("workout-preview")}
+          onResetData={handleResetData}
+          onRegenerateWorkout={handleRegenerateWorkout}
+        />
       )}
     </>
   );

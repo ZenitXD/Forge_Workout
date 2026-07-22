@@ -150,7 +150,7 @@ export async function createInitialBlock(goal: UserProfile["goal"]): Promise<Tra
     .insert({
       phase: firstPhase,
       cycle_index: 0,
-      week_index: 1,
+      week_index: 0,
       block_length_weeks: PHASE_CONFIG[firstPhase].weeks,
       status: "active",
     })
@@ -192,7 +192,7 @@ export async function advancePhase(block: TrainingBlock): Promise<TrainingBlock>
     .insert({
       phase: nextPhase,
       cycle_index: nextCycle,
-      week_index: 1,
+      week_index: 0,
       block_length_weeks: PHASE_CONFIG[nextPhase].weeks,
       status: "active",
     })
@@ -241,6 +241,7 @@ const SPLIT_TEMPLATES: Record<SplitId, { name: string; days: SlotRequirement[][]
         { slotTag: "vertical-pull", primaryMuscle: "back", compound: true },
         { slotTag: "horizontal-pull", primaryMuscle: "back", compound: true },
         { slotTag: "rear-delt", primaryMuscle: "shoulders" },
+        { slotTag: "biceps", primaryMuscle: "arms" },
         { slotTag: "biceps", primaryMuscle: "arms" },
       ],
       [
@@ -362,7 +363,7 @@ async function generateProfiledWorkout(
 
   const maxExercises = Math.min(
     slots.length,
-    Math.floor(profile.sessionDuration / 10),
+    Math.max(5, Math.floor(profile.sessionDuration / 8)),
   );
 
   const chosen: ExerciseDB[] = [];
@@ -716,6 +717,13 @@ export function getSplitInfo(split: SplitId): { name: string; dayCount: number }
 // Phase 2: Exercise History & Rotation Scoring
 // ============================================================
 
+export async function resetAllData(): Promise<void> {
+  const tables = ["logged_sets", "workout_exercises", "workouts", "training_blocks", "profiles"];
+  for (const table of tables) {
+    await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  }
+}
+
 export async function fetchExerciseHistory(): Promise<Map<string, number>> {
   const { data, error } = await supabase.rpc("exercise_last_performed");
   if (error || !data) return new Map();
@@ -855,7 +863,7 @@ export async function advanceWorkoutDay(
     id: crypto.randomUUID(),
     phase: PHASE_CYCLE_ORDER[nextPhaseIdx],
     cycleIndex: newCycleIndex,
-    weekIndex: 1,
+    weekIndex: 0,
     blockLengthWeeks: PHASE_CONFIG[PHASE_ORDER[nextPhaseIdx]].weeks,
     status: "active",
     startedAt: new Date().toISOString(),

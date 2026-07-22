@@ -102,6 +102,37 @@ export function Icon({ name, size = 24, color = "currentColor", strokeWidth = 2,
         <polyline points="22 4 12 14.01 9 11.01" />
       </>
     ),
+    "trash-2": (
+      <>
+        <polyline points="3 6 5 6 21 6" />
+        <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+      </>
+    ),
+    "refresh-cw": (
+      <>
+        <polyline points="23 4 23 10 17 10" />
+        <polyline points="1 20 1 14 7 14" />
+        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+      </>
+    ),
+    "thumbs-up": (
+      <>
+        <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" />
+      </>
+    ),
+    "thumbs-down": (
+      <>
+        <path d="M10 15v5a3 3 0 003 3l4-9V4H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3zM17 4h3a2 2 0 012 2v7a2 2 0 01-2 2h-3" />
+      </>
+    ),
+    meh: (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <line x1="8" y1="15" x2="16" y2="15" />
+        <line x1="9" y1="9" x2="9.01" y2="9" />
+        <line x1="15" y1="9" x2="15.01" y2="9" />
+      </>
+    ),
   };
 
   return (
